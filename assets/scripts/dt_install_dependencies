@@ -1,0 +1,53 @@
+#!/bin/bash
+
+set -e
+apt-get update
+
+if [[ "$*" == "--python-deps" ]]
+then
+  for pkg in \
+    $(rosdep check \
+      --from-paths src \
+      --ignore-src \
+      | grep "python" \
+      | sed -e "s/^apt\t//g" \
+      | sed -e "s/python-/python3-/g" \
+      | sort \
+      | uniq \
+      | sed -z "s/\n/ /g"\
+    )
+  do
+    echo ">> Installing $pkg..."
+    set +e
+    apt-get install -y --no-install-recommends --ignore-missing $pkg > /dev/null
+    set -e
+    echo "<< Finished $pkg"
+  done
+fi
+
+
+if [[ "$*" == "--no-python-deps" ]]
+then
+  for pkg in \
+    $(rosdep check \
+      --from-paths src \
+      --ignore-src \
+      | grep -v "python" \
+      | sed "/libboost/d" \
+      | sed "/:/d" \
+      | sed -e "s/^apt\t//g" \
+      | sort \
+      | uniq \
+      | sed -z "s/\n/ /g" \
+    )
+  do
+    echo ">> Installing $pkg..."
+    set +e
+    apt-get install -y --no-install-recommends --ignore-missing $pkg > /dev/null
+    set -e
+    echo "<< Finished $pkg"
+  done
+fi
+
+rm -rf /var/lib/apt/lists/*
+set +e

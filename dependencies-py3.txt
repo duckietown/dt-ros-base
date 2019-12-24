@@ -1,0 +1,9 @@
+# LIST YOUR PYTHON PACKAGES HERE
+rosdep
+catkin_tools
+rospkg
+catkin-pkg
+rosinstall_generator
+rosinstall
+wstool
+vcstools

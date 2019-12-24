@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -e
+
+PACKAGES=$(sed -e '/#[ ]*BLACKLIST/,$d' $1 | sed "/^#/d" | uniq)
+
+rosinstall_generator \
+  $PACKAGES \
+  --rosdistro melodic \
+  --deps \
+  --tar \
+  | wstool \
+    merge \
+    -t src - \
+  && wstool \
+    update \
+    -t src
+
+set +e
