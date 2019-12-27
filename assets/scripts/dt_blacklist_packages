@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+# get list of packages to blacklist (after the BLACKLIST keyword)
+BLACKLIST=$(sed -e "1,/#[ ]*BLACKLIST/d" $1 | sed "/^#/d" | uniq)
+HAS_BLACKLIST=$(echo $BLACKLIST | sed '/^\s*#/d;/^\s*$/d' | wc -l)
+if [ $HAS_BLACKLIST -eq 1 ]; then
+  catkin config --append-args --blacklist $BLACKLIST
+fi
+
+set +e

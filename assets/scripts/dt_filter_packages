@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import yaml
+import argparse
+import traceback
+
+# disable stdout
+_stdout = sys.stdout
+sys.stdout = open(os.devnull, 'w')
+
+# constants
+archive_type = 'repo'
+
+try:
+    # read arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tar', action='store_true', default=False,
+        help='Use tarballs instead of repositories for catkin packages (rosbuild stacks are always tarballs)')
+    parser.add_argument('--keys-only', action='store_true', default=False,
+        help='Return a space-separated list of local package names instead of the full YAML')
+    parser.add_argument('-t', '--workspace', default=os.getcwd(),
+        help='Target workspace')
+    parsed = parser.parse_args(sys.argv[1:])
+
+    # use arguments
+    if parsed.tar:
+        archive_type = 'tar'
+
+    # read input pipe
+    pkgs = yaml.load(sys.stdin, Loader=yaml.FullLoader)
+
+    # filter packages (remove existing ones)
+    keep = []
+    keep_keys = []
+    for pkg in pkgs:
+        # get path to package
+        local_path = pkg[archive_type]['local-name']
+        if not os.path.isabs(local_path):
+            local_path = os.path.abspath(os.path.join(parsed.workspace, 'src', local_path))
+        # keep it if it is a new package
+        if not os.path.exists(local_path):
+            keep.append(pkg)
+            keep_keys.append(pkg[archive_type]['local-name'])
+
+    # write filtered packages to stdout
+    if parsed.keys_only:
+        _stdout.write(' '.join(keep_keys))
+    else:
+        yaml.dump(keep, stream=_stdout)
+    _stdout.flush()
+
+    # notify status via stderr
+    sys.stderr.write(f'Filtered packages: Total {len(pkgs)}, kept {len(keep)}, pkgs={str(keep_keys)}\n')
+    sys.stderr.flush()
+except Exception as e:
+    traceback.print_exc(file=sys.stderr)

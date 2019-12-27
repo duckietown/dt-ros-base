@@ -1,53 +1,72 @@
 #!/bin/bash
 
 set -e
+
+# update apt lists
 apt-get update
 
-if [[ "$*" == "--python-deps" ]]
-then
-  for pkg in \
-    $(rosdep check \
-      --from-paths src \
-      --ignore-src \
-      | grep "python" \
-      | sed -e "s/^apt\t//g" \
-      | sed -e "s/python-/python3-/g" \
-      | sort \
-      | uniq \
-      | sed -z "s/\n/ /g"\
-    )
-  do
-    echo ">> Installing $pkg..."
-    set +e
-    apt-get install -y --no-install-recommends --ignore-missing $pkg > /dev/null
-    set -e
-    echo "<< Finished $pkg"
-  done
-fi
+# create (if not present) the list of installed libraries
+touch ./dependencies.apt.installed
+touch ./dependencies.pip3.installed
+
+# INSTALL: Python libraries only
+# get all dependencies for the workspace
+rosdep check \
+  --from-paths $@ \
+  --ignore-src \
+  | grep "python" \
+  | sed -e "s/^apt\t//g" \
+  | sed -e "s/python-/python3-/g" \
+  | sort \
+  | uniq \
+> /tmp/dependencies.pip3.toinstall
+# get only those that are not installed yet
+DEPS=$(comm -23 /tmp/dependencies.pip3.toinstall ./dependencies.pip3.installed)
+# (try to) install all dependencies
+for dep in $DEPS; do
+  echo ">> Installing $dep..."
+  set +e
+  apt-get install -y --no-install-recommends --ignore-missing $dep > /dev/null
+  set -e
+  echo "<< Finished $dep"
+done
+# update list of installed dependencies
+echo "$DEPS" >> ./dependencies.pip3.installed
+INSTALLED=$(sort ./dependencies.pip3.installed)
+echo "$INSTALLED" > ./dependencies.pip3.installed
+# clean up
+rm -f /tmp/dependencies.pip3.toinstall
 
 
-if [[ "$*" == "--no-python-deps" ]]
-then
-  for pkg in \
-    $(rosdep check \
-      --from-paths src \
-      --ignore-src \
-      | grep -v "python" \
-      | sed "/libboost/d" \
-      | sed "/:/d" \
-      | sed -e "s/^apt\t//g" \
-      | sort \
-      | uniq \
-      | sed -z "s/\n/ /g" \
-    )
-  do
-    echo ">> Installing $pkg..."
-    set +e
-    apt-get install -y --no-install-recommends --ignore-missing $pkg > /dev/null
-    set -e
-    echo "<< Finished $pkg"
-  done
-fi
+# INSTALL: NON-Python libraries only
+rosdep check \
+  --from-paths $@ \
+  --ignore-src \
+  | grep -v "python" \
+  | sed "/libboost/d" \
+  | sed "/:/d" \
+  | sed -e "s/^apt\t//g" \
+  | sort \
+  | uniq \
+> /tmp/dependencies.apt.toinstall
+# get only those that are not installed yet
+DEPS=$(comm -23 /tmp/dependencies.apt.toinstall ./dependencies.apt.installed)
+# (try to) install all dependencies
+for dep in $DEPS; do
+  echo ">> Installing $dep..."
+  set +e
+  apt-get install -y --no-install-recommends --ignore-missing $dep > /dev/null
+  set -e
+  echo "<< Finished $dep"
+done
+# update list of installed dependencies
+echo "$DEPS" >> ./dependencies.apt.installed
+INSTALLED=$(sort ./dependencies.apt.installed)
+echo "$INSTALLED" > ./dependencies.apt.installed
+# clean up
+rm -f /tmp/dependencies.apt.toinstall
 
+# clean apt lists
 rm -rf /var/lib/apt/lists/*
+
 set +e

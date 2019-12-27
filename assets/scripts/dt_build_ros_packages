@@ -1,0 +1,12 @@
+#!/bin/bash
+
+set -e
+
+# build
+catkin build
+
+# clean
+catkin clean -y --logs
+find . -type d -name '__pycache__' -exec rm -rf {} +
+
+set +e

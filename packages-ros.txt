@@ -1,7 +1,10 @@
 # LIST YOUR ROS PACKAGES HERE
-#robot
-#joystick_drivers
-geometry_msgs
+
+# ROS base
+ros_comm
+
+# Other ROS packages
+robot
 
 # BLACKLIST
 python_orocos_kdl

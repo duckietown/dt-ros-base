@@ -1,6 +1,3 @@
-# parameters
-ARG REPO_NAME="dt-ros-base"
-
 ARG ARCH=arm32v7
 ARG ROS_DISTRO=melodic
 ARG OS_DISTRO=bionic
@@ -8,7 +5,6 @@ ARG BASE_TAG=${ROS_DISTRO}-ros-base-${OS_DISTRO}
 
 FROM ${ARCH}/ubuntu:${OS_DISTRO}
 
-ARG REPO_NAME
 ARG ARCH
 ARG ROS_DISTRO
 ARG OS_DISTRO
@@ -24,8 +20,8 @@ ENV ROS_PYTHON_VERSION 3
 ENV DEBIAN_FRONTEND noninteractive
 ENV ROS_DISTRO "${ROS_DISTRO}"
 ENV OS_DISTRO "${OS_DISTRO}"
-ENV ROS_INSTALL_DIR /opt/ros/${ROS_DISTRO}/
-ENV ROS_SRC_DIR /ros_ws
+ENV ROS_INSTALL_DIR /opt/ros/${ROS_DISTRO}
+ENV ROS_SRC_DIR /ros_ws/${ROS_DISTRO}
 
 # copy QEMU
 COPY ./assets/qemu/${ARCH}/ /usr/bin/
@@ -63,6 +59,12 @@ RUN sed \
   's/__default_terminal_width = 80/__default_terminal_width = 160/' \
   /usr/local/lib/python3.6/dist-packages/catkin_tools/common.py
 
+# fix deprecated yaml loader in wstool
+RUN sed \
+  -i \
+  's/yamldata = yaml.load(stream)/yamldata = yaml.load(stream, Loader=yaml.FullLoader)/' \
+  /usr/local/lib/python3.6/dist-packages/wstool/config_yaml.py
+
 # remove dependencies files
 RUN rm /tmp/dependencies*
 
@@ -93,68 +95,43 @@ RUN cd /usr/src \
   && rm -rf /usr/src/*
 
 # create a workspace where we can build ROS
-ARG ROS_PKGS_SRC_DIR="${ROS_SRC_DIR}/${REPO_NAME}/"
-RUN mkdir -p ${ROS_PKGS_SRC_DIR}
-WORKDIR ${ROS_PKGS_SRC_DIR}
-RUN catkin \
-  config \
+RUN mkdir -p ${ROS_SRC_DIR}
+RUN \
+  set -ex; \
+  cd ${ROS_SRC_DIR}; \
+  catkin config \
     --init \
     -DCMAKE_BUILD_TYPE=Release \
     --install-space ${ROS_INSTALL_DIR} \
-    --install
-
-# setup ROS install
-RUN rosinstall_generator \
-  ros_comm \
-    --rosdistro melodic \
-    --deps \
-    --tar > ros-melodic.rosinstall \
-  && wstool \
-    init \
+    --install; \
+  wstool init \
     -j $(nproc) \
-    src \
-    ros-melodic.rosinstall \
-  && rm ros-melodic.rosinstall
+    src; \
+  set +ex
 
 # install utility scripts
 COPY assets/scripts/* /usr/local/bin/
 
-# analyze additional ROS packages
+# install dependencies for ROS and all additional packages
 COPY packages-ros.txt /tmp/packages-ros.txt
 RUN \
-  set -e; \
-  PACKAGES=$(sed -e '/#[ ]*BLACKLIST/,$d' /tmp/packages-ros.txt | sed "/^#/d" | uniq); \
-  NUM_PACKAGES=$(echo $PACKAGES | sed '/^\s*#/d;/^\s*$/d' | wc -l); \
-  if [ $NUM_PACKAGES -ge 1 ]; then \
+  set -ex; \
+  cd ${ROS_SRC_DIR}; \
+  PACKAGES=$(sed -e '/#[ ]*BLACKLIST/,$d' /tmp/packages-ros.txt | sed "/^#/d" | uniq | sed -z "s/\n/ /g"); \
+  HAS_PACKAGES=$(echo $PACKAGES | sed '/^\s*#/d;/^\s*$/d' | wc -l); \
+  if [ $HAS_PACKAGES -eq 1 ]; then \
     # merge ROS packages into the current workspace
     dt_analyze_packages /tmp/packages-ros.txt; \
     # replace python -> python3 in all the shebangs of the packages
     dt_py2to3; \
-    # blacklist ROS packages
-    SKIP_BLACKLIST=$(grep -q "BLACKLIST" /tmp/packages-ros.txt && echo $?); \
-    if [ "${SKIP_BLACKLIST}" -eq 0 ]; then \
-      BLACKLIST=$(sed -e "1,/#[ ]*BLACKLIST/d" /tmp/packages-ros.txt | sed "/^#/d" | uniq); \
-      catkin config \
-        --append-args \
-        --blacklist $BLACKLIST; \
-    fi; \
+    # blacklist packages
+    dt_blacklist_packages /tmp/packages-ros.txt; \
+    # install dependencies (replacing python -> python3, excluding libboost)
+    dt_install_dependencies ./src; \
+    # build and clean
+    dt_build_ros_packages; \
   fi; \
-  set +e
-
-# install dependencies for ROS packages
-RUN \
-  # install all python dependencies (replacing python -> python3)
-  dt_install_dependencies --python-deps; \
-  # install all non-python dependencies (exclude libboost, we build it from source for python3)
-  dt_install_dependencies --no-python-deps;
-
-# build ROS (and additional packages)
-RUN catkin build \
-  && catkin clean -y \
-    --logs
-
-# change working dir
-WORKDIR /root
+  set +ex
 
 # configure command
 CMD ["bash"]

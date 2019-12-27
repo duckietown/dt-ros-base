@@ -2,6 +2,6 @@
 
 set -e
 
-find . -type f -exec sed -i 's/\/usr\/bin\/env[ ]*python[^3][ ]*$/\/usr\/bin\/env python3/g' {} +
+find . -type f -exec sed -i 's/\/usr\/bin\/env[ ]*python[^3]*[ ]*$/\/usr\/bin\/env python3/g' {} +
 
 set +e
