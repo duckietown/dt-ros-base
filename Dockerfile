@@ -26,22 +26,12 @@ ENV ROS_SRC_DIR /ros_ws/${ROS_DISTRO}
 # copy QEMU
 COPY ./assets/qemu/${ARCH}/ /usr/bin/
 
-# add python3.7 sources to APT
-# RUN echo "deb http://ppa.launchpad.net/deadsnakes/ppa/ubuntu xenial main" >> /etc/apt/sources.list
-# RUN echo "deb-src http://ppa.launchpad.net/deadsnakes/ppa/ubuntu xenial main" >> /etc/apt/sources.list
-# RUN gpg --keyserver keyserver.ubuntu.com --recv 6A755776 \
-#  && gpg --export --armor 6A755776 | apt-key add -
-
 # install apt dependencies
 COPY ./dependencies-apt.txt /tmp/dependencies-apt.txt
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     $(awk -F: '/^[^#]/ { print $1 }' /tmp/dependencies-apt.txt | uniq) \
   && rm -rf /var/lib/apt/lists/*
-
-# update alternatives for python, python3
-# RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.7 1
-# RUN update-alternatives --install /usr/bin/python3 python /usr/bin/python3.7 1
 
 # install pip3
 RUN cd /tmp \
@@ -75,9 +65,6 @@ RUN ldconfig
 
 # initialize rosdep
 RUN rosdep init && rosdep update
-
-# setup environment and install dependencies
-# RUN pip3 install -U -f https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-18.04 wxPython
 
 # build libboost for Python3
 RUN cd /usr/src \
