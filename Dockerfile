@@ -99,7 +99,7 @@ RUN \
 # install utility scripts
 COPY assets/scripts/* /usr/local/bin/
 
-# install dependencies for ROS and all additional packages
+# build ROS packages
 COPY packages-ros.txt /tmp/packages-ros.txt
 RUN \
   set -ex; \
