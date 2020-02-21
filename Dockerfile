@@ -58,11 +58,6 @@ RUN sed \
 # remove dependencies files
 RUN rm /tmp/dependencies*
 
-# RPi libs
-ADD assets/vc.tgz /opt/
-COPY assets/00-vmcs.conf /etc/ld.so.conf.d
-RUN ldconfig
-
 # initialize rosdep
 RUN rosdep init && rosdep update
 
