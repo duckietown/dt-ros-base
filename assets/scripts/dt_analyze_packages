@@ -12,7 +12,7 @@ rosinstall_generator $PACKAGES --rosdistro melodic --deps --tar > /tmp/rosinstal
 cat /tmp/rosinstall.dat | dt_filter_packages --tar --keys-only > /tmp/rosinstall.newkeys.dat
 
 # merge the existing workspace with the one defined in the rosinstall YAML string
-wstool merge -t src /tmp/rosinstall.dat
+wstool merge -t src --merge-replace /tmp/rosinstall.dat
 
 # use wstool to pull the new packages
 wstool update -t src $(cat /tmp/rosinstall.newkeys.dat)
